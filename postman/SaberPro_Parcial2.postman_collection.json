@@ -1,0 +1,235 @@
+{
+  "info": {
+    "name": "SaberPro - Parcial 2 Corte II (v2)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Crear pregunta válida (201 Created)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201 Created', () => pm.response.to.have.status(201));",
+              "const b = pm.response.json();",
+              "pm.test('Estado DRAFT', () => pm.expect(b.status).to.eql('DRAFT'));",
+              "pm.test('Tiene id', () => pm.expect(b.id).to.be.a('number'));",
+              "pm.collectionVariables.set('questionId', b.id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8083/questions",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8083",
+          "path": [
+            "questions"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"statement\": \"¿Cuál es la capital de Colombia?\",\n  \"options\": [\n    {\n      \"key\": \"A\",\n      \"text\": \"Medellín\"\n    },\n    {\n      \"key\": \"B\",\n      \"text\": \"Bogotá\"\n    },\n    {\n      \"key\": \"C\",\n      \"text\": \"Cali\"\n    },\n    {\n      \"key\": \"D\",\n      \"text\": \"Popayán\"\n    }\n  ],\n  \"correctKey\": \"B\",\n  \"justification\": \"Bogotá es la capital y sede de los órganos del gobierno nacional.\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "2. Rechazo por validación estructural (400 Bad Request)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+              "const b = pm.response.json();",
+              "pm.test('Devuelve lista de errores', () => { pm.expect(b.errors).to.be.an('array'); pm.expect(b.errors.length).to.be.above(0); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8083/questions",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8083",
+          "path": [
+            "questions"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"statement\": \"Pregunta inválida\",\n  \"options\": [\n    {\n      \"key\": \"A\",\n      \"text\": \"uno\"\n    },\n    {\n      \"key\": \"B\",\n      \"text\": \"dos\"\n    },\n    {\n      \"key\": \"C\",\n      \"text\": \"tres\"\n    }\n  ],\n  \"correctKey\": \"Z\",\n  \"justification\": \"corta\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "3. Enviar a revisión (202 Accepted)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('202 Accepted', () => pm.response.to.have.status(202));",
+              "const b = pm.response.json();",
+              "pm.test('operationId presente', () => pm.expect(b.operationId).to.be.a('string').and.not.empty);",
+              "pm.test('Estado PROCESSING', () => pm.expect(b.status).to.eql('PROCESSING'));",
+              "pm.collectionVariables.set('operationId', b.operationId);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8083/questions/{{questionId}}/submit",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8083",
+          "path": [
+            "questions",
+            "{{questionId}}",
+            "submit"
+          ]
+        }
+      }
+    },
+    {
+      "name": "4a. Cola en RabbitMQ (consola de gestión)",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "setTimeout(function(){}, 1500);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('La cola existe', () => pm.response.to.have.status(200));",
+              "const q = pm.response.json();",
+              "pm.test('Mensaje entregado y consumido', () => pm.expect(q.message_stats.publish).to.be.above(0));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:15672/api/queues/%2F/question.submit.review.queue",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "15672",
+          "path": [
+            "api",
+            "queues",
+            "%2F",
+            "question.submit.review.queue"
+          ]
+        },
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "guest",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "guest",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "4b. Estado final en Lifecycle (PENDING_REVIEW)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "pm.test('PENDING_REVIEW', () => pm.expect(pm.response.json().status).to.eql('PENDING_REVIEW'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8084/lifecycle/questions/{{questionId}}",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8084",
+          "path": [
+            "lifecycle",
+            "questions",
+            "{{questionId}}"
+          ]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "questionId",
+      "value": "1"
+    },
+    {
+      "key": "operationId",
+      "value": ""
+    }
+  ]
+}
